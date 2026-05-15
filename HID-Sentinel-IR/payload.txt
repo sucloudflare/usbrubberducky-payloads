@@ -12,7 +12,7 @@ DELAY 1500
 
 LED SETUP
 
-REM === Launch Lightweight Sentinel ===
+REM === Launch HID Sentinel ===
 GUI r
 DELAY 700
 STRING powershell -NoP -Ep Bypass -W Hidden -C "
@@ -20,25 +20,21 @@ $Host.UI.RawUI.WindowTitle = 'HID Sentinel IR v1.0';
 function Log { param($m,$l='INFO'); $t=Get-Date -Format 'HH:mm:ss'; \"[$t] [$l] $m\" | Out-File 'C:\Windows\Temp\sentinel.log' -Append -Encoding UTF8; Write-Host \"[$l] $m\" -ForegroundColor (@{INFO='White';WARN='Yellow';ALERT='Red';SUCCESS='Green'}[$l]) };
 Log 'HID Sentinel IR v1.0 started - Anti-BadUSB Protection' 'SUCCESS';
 
-# Rogue USB Detection
 Register-WmiEvent -Class Win32_DeviceChangeEvent -SourceIdentifier 'USBChange' -Action {
     if ($Event.SourceEventArgs.NewEvent.EventType -eq 2) {
-        Start-Sleep -Milliseconds 600;
+        Start-Sleep -Milliseconds 700;
         $usb = Get-PnpDevice -Class USB | Where-Object Status -eq 'OK' | Select-Object -Last 5;
         foreach($d in $usb) {
             $name = $d.FriendlyName;
             if ($name -match '(?i)Rubber Ducky|BadUSB|HID Injector|Attack') {
-                Log \"🚨 ROGUE BADUSB DETECTED: $name\" 'ALERT';
+                Log \"ROGUE BADUSB DETECTED: $name\" 'ALERT';
             }
         }
     }
 };
 
-# Low noise PowerShell monitoring
 while($true) {
-    Get-Process -Name 'powershell*' -ErrorAction SilentlyContinue | Where-Object {
-        $_.CommandLine -match '(?i)iex|downloadstring|invoke-webrequest'
-    } | ForEach-Object {
+    Get-Process -Name 'powershell*' -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match '(?i)iex|downloadstring|invoke-webrequest' } | ForEach-Object {
         Log \"Suspicious PowerShell detected (PID: $($_.Id))\" 'WARN';
     };
     Start-Sleep -Seconds 12;
