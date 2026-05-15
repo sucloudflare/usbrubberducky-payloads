@@ -1,6 +1,6 @@
 REM Title: HID Sentinel IR v1.0
 REM Author: sucloudflare
-REM Description: Lightweight Anti-BadUSB defensive framework. Detects rogue USB devices via WMI and suspicious PowerShell activity.
+REM Description: Lightweight defensive framework against BadUSB/HID attacks. Detects rogue USB devices and suspicious PowerShell activity with low noise.
 REM Target: Windows 10/11
 REM Version: 1.0
 REM Category: Incident Response
@@ -12,23 +12,50 @@ DELAY 1500
 
 LED SETUP
 
-REM Launch Sentinel
+REM === Launch Lightweight Sentinel ===
 GUI r
-DELAY 600
-STRING powershell -NoP -Ep Bypass -W Hidden -C "irm http://127.0.0.1:8080/sentinel.ps1 | iex"
+DELAY 700
+STRING powershell -NoP -Ep Bypass -W Hidden -C "
+$Host.UI.RawUI.WindowTitle = 'HID Sentinel IR v1.0';
+function Log { param($m,$l='INFO'); $t=Get-Date -Format 'HH:mm:ss'; \"[$t] [$l] $m\" | Out-File 'C:\Windows\Temp\sentinel.log' -Append -Encoding UTF8; Write-Host \"[$l] $m\" -ForegroundColor (@{INFO='White';WARN='Yellow';ALERT='Red';SUCCESS='Green'}[$l]) };
+Log 'HID Sentinel IR v1.0 started - Anti-BadUSB Protection' 'SUCCESS';
+
+# Rogue USB Detection
+Register-WmiEvent -Class Win32_DeviceChangeEvent -SourceIdentifier 'USBChange' -Action {
+    if ($Event.SourceEventArgs.NewEvent.EventType -eq 2) {
+        Start-Sleep -Milliseconds 600;
+        $usb = Get-PnpDevice -Class USB | Where-Object Status -eq 'OK' | Select-Object -Last 5;
+        foreach($d in $usb) {
+            $name = $d.FriendlyName;
+            if ($name -match '(?i)Rubber Ducky|BadUSB|HID Injector|Attack') {
+                Log \"🚨 ROGUE BADUSB DETECTED: $name\" 'ALERT';
+            }
+        }
+    }
+};
+
+# Low noise PowerShell monitoring
+while($true) {
+    Get-Process -Name 'powershell*' -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -match '(?i)iex|downloadstring|invoke-webrequest'
+    } | ForEach-Object {
+        Log \"Suspicious PowerShell detected (PID: $($_.Id))\" 'WARN';
+    };
+    Start-Sleep -Seconds 12;
+}
+"
 ENTER
 
-DELAY 1500
+DELAY 1800
 ALT y
-DELAY 1000
+DELAY 1200
 ALT y
-DELAY 2500
+DELAY 2800
 
 LED ATTACK
-DELAY 3000
 
-REM Open dashboard / log
-STRING "Start-Process http://127.0.0.1:8080/dashboard.html"
+DELAY 3500
+STRING notepad C:\Windows\Temp\sentinel.log
 ENTER
 
 LED FINISH
